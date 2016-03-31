@@ -5,8 +5,9 @@
 #include <multicolors>
 
 #pragma newdecls required
+#pragma semicolon 1
 
-#define PL_VERSION "1.1"
+#define PL_VERSION "1.2"
 #define MAXENTITIES 2048
 
 public Plugin myinfo =
@@ -19,15 +20,16 @@ public Plugin myinfo =
 };
 
 // ConVars
-ConVar g_hConfigPath = null;
-ConVar g_hDefaultHealth = null;
-ConVar g_hDefaultMultiplier = null;
-ConVar g_hColor = null;
-ConVar g_hTeamRestriction = null;
-ConVar g_hPrint = null;
-ConVar g_hPrintType = null;
-ConVar g_hPrintMessage = null;
-ConVar g_hDebug = null;
+ConVar g_cvConfigPath = null;
+ConVar g_cvDefaultHealth = null;
+ConVar g_cvDefaultMultiplier = null;
+ConVar g_cvColor = null;
+ConVar g_cvTeamRestriction = null;
+ConVar g_cvPrint = null;
+ConVar g_cvPrintType = null;
+ConVar g_cvPrintMessage = null;
+ConVar g_cvDebug = null;
+ConVar g_cvMaxHealth = null;
 
 // ConVar Values
 char g_sConfigPath[PLATFORM_MAX_PATH];
@@ -39,6 +41,7 @@ bool g_bPrint;
 int g_iPrintType;
 char g_sPrintMessage[256];
 bool g_bDebug;
+int g_iMaxHealth;
 
 // Other Variables
 int g_aiPropHealth[MAXENTITIES + 1];
@@ -50,15 +53,16 @@ public void OnPluginStart()
 	// ConVars
 	CreateConVar("sm_ph_version", PL_VERSION, "Prop Health's version.");
 	
-	g_hConfigPath = CreateConVar("sm_ph_config_path", "configs/prophealth.props.cfg", "The path to the Prop Health config.");
-	g_hDefaultHealth = CreateConVar("sm_ph_default_health", "-1", "A prop's default health if not defined in the config file. -1 = Doesn't break.");
-	g_hDefaultMultiplier = CreateConVar("sm_ph_default_multiplier", "325.00", "Default multiplier based on the player count (for zombies/humans). Default: 65 * 5 (65 damage by right-click knife with 5 hits)");
-	g_hColor = CreateConVar("sm_ph_color", "255 0 0 255", "If a prop has a color, set it to this color. -1 = no color. uses RGBA.");
-	g_hTeamRestriction = CreateConVar("sm_ph_team", "2", "What team are allowed to destroy props? 0 = no restriction, 1 = humans, 2 = zombies.");
-	g_hPrint = CreateConVar("sm_ph_print", "1", "Print the prop's health when damaged to the attacker's chat?");
-	g_hPrintType = CreateConVar("sm_ph_print_type", "1", "The print type (if \"sm_ph_print\" is set to 1). 1 = PrintToChat, 2 = PrintCenterText, 3 = PrintHintText.");
-	g_hPrintMessage = CreateConVar("sm_ph_print_message", "{darkred}[PH]{default}Prop Health: {lightgreen}%i", "The message to send to the client. Multicolors supported only for PrintToChat. %i = health value.");
-	g_hDebug = CreateConVar("sm_ph_debug", "0", "Enable debugging (logging will go to logs/prophealth-debug.log).");
+	g_cvConfigPath = CreateConVar("sm_ph_config_path", "configs/prophealth.props.cfg", "The path to the Prop Health config.");
+	g_cvDefaultHealth = CreateConVar("sm_ph_default_health", "-1", "A prop's default health if not defined in the config file. -1 = Doesn't break.");
+	g_cvDefaultMultiplier = CreateConVar("sm_ph_default_multiplier", "325.00", "Default multiplier based on the player count (for zombies/humans). Default: 65 * 5 (65 damage by right-click knife with 5 hits)");
+	g_cvColor = CreateConVar("sm_ph_color", "255 0 0 255", "If a prop has a color, set it to this color. -1 = no color. uses RGBA.");
+	g_cvTeamRestriction = CreateConVar("sm_ph_team", "2", "What team are allowed to destroy props? 0 = no restriction, 1 = humans, 2 = zombies.");
+	g_cvPrint = CreateConVar("sm_ph_print", "1", "Print the prop's health when damaged to the attacker's chat?");
+	g_cvPrintType = CreateConVar("sm_ph_print_type", "1", "The print type (if \"sm_ph_print\" is set to 1). 1 = PrintToChat, 2 = PrintCenterText, 3 = PrintHintText.");
+	g_cvPrintMessage = CreateConVar("sm_ph_print_message", "{darkred}[PH]{default}Prop Health: {lightgreen}%i", "The message to send to the client. Multicolors supported only for PrintToChat. %i = health value.");
+	g_cvDebug = CreateConVar("sm_ph_debug", "0", "Enable debugging (logging will go to logs/prophealth-debug.log).");
+	g_cvMaxHealth = CreateConVar("sm_ph_maxhealth", "0", "Maximum health for props (0=no max)");
 	
 	AutoExecConfig(true, "plugin.prop-health");
 	
@@ -67,15 +71,16 @@ public void OnPluginStart()
 }
 
 void LoadSettings(){
-	GetConVarString(g_hConfigPath, g_sConfigPath, sizeof(g_sConfigPath));
-	g_iDefaultHealth = GetConVarInt(g_hDefaultHealth);
-	g_fDefaultMultiplier = GetConVarFloat(g_hDefaultMultiplier);
-	GetConVarString(g_hColor, g_sColor, sizeof(g_sColor));
-	g_iTeamRestriction = GetConVarInt(g_hTeamRestriction);
-	g_bPrint = GetConVarBool(g_hPrint);
-	g_iPrintType = GetConVarInt(g_hPrintType);
-	GetConVarString(g_hPrintMessage, g_sPrintMessage, sizeof(g_sPrintMessage));
-	g_bDebug = GetConVarBool(g_hDebug);
+	GetConVarString(g_cvConfigPath, g_sConfigPath, sizeof(g_sConfigPath));
+	g_iDefaultHealth = GetConVarInt(g_cvDefaultHealth);
+	g_fDefaultMultiplier = GetConVarFloat(g_cvDefaultMultiplier);
+	GetConVarString(g_cvColor, g_sColor, sizeof(g_sColor));
+	g_iTeamRestriction = GetConVarInt(g_cvTeamRestriction);
+	g_bPrint = GetConVarBool(g_cvPrint);
+	g_iPrintType = GetConVarInt(g_cvPrintType);
+	GetConVarString(g_cvPrintMessage, g_sPrintMessage, sizeof(g_sPrintMessage));
+	g_bDebug = GetConVarBool(g_cvDebug);
+	g_iMaxHealth = GetConVarInt(g_cvMaxHealth);
 	
 	BuildPath(Path_SM, g_sLogFile, sizeof(g_sLogFile), "logs/prophealth-debug.log");
 }
@@ -91,15 +96,16 @@ public void OnConfigsExecuted()
 	LoadSettings();
 	
 	// Hook changes afterwards to avoid CVarChanged spam
-	HookConVarChange(g_hConfigPath, CVarChanged);
-	HookConVarChange(g_hDefaultHealth, CVarChanged);	
-	HookConVarChange(g_hDefaultMultiplier, CVarChanged);	
-	HookConVarChange(g_hColor, CVarChanged);	
-	HookConVarChange(g_hTeamRestriction, CVarChanged);		
-	HookConVarChange(g_hPrint, CVarChanged);		
-	HookConVarChange(g_hPrintType, CVarChanged);		
-	HookConVarChange(g_hPrintMessage, CVarChanged);	
-	HookConVarChange(g_hDebug, CVarChanged);
+	HookConVarChange(g_cvConfigPath, CVarChanged);
+	HookConVarChange(g_cvDefaultHealth, CVarChanged);	
+	HookConVarChange(g_cvDefaultMultiplier, CVarChanged);	
+	HookConVarChange(g_cvColor, CVarChanged);	
+	HookConVarChange(g_cvTeamRestriction, CVarChanged);		
+	HookConVarChange(g_cvPrint, CVarChanged);		
+	HookConVarChange(g_cvPrintType, CVarChanged);		
+	HookConVarChange(g_cvPrintMessage, CVarChanged);	
+	HookConVarChange(g_cvDebug, CVarChanged);
+	HookConVarChange(g_cvMaxHealth, CVarChanged);
 }
 
 public void OnMapStart()
@@ -337,6 +343,7 @@ stock void SetPropHealth(int iEnt)
 		float fAddHealth = float(iClientCount) * g_fDefaultMultiplier;
 		
 		g_aiPropHealth[iEnt] += RoundToZero(fAddHealth);
+		
 		if (g_bDebug)
 		{
 			LogToFile(g_sLogFile, "Prop is being set to default health. (Prop: %i) (O - Default Health: %i) (Default Multiplier: %f) (Added Health: %i) (Health: %i) (Client Count: %i)", iEnt, g_iDefaultHealth, g_fDefaultMultiplier, RoundToZero(fAddHealth), g_aiPropHealth[iEnt], iClientCount);
@@ -362,6 +369,14 @@ stock void SetPropHealth(int iEnt)
 		
 		ExplodeString(g_sColor, " ", sBit, sizeof (sBit), sizeof (sBit[]));
 		SetEntityRenderColor(iEnt, StringToInt(sBit[0]), StringToInt(sBit[1]), StringToInt(sBit[2]), StringToInt(sBit[3]));
+	}
+	
+	if(g_iMaxHealth > 0 && g_aiPropHealth[iEnt] > g_iMaxHealth){
+		if (g_bDebug)
+		{
+			LogToFile(g_sLogFile, "Prop exceeded max health. Health set to max. (Prop: %i) (Previous health: %i) (Max health: %f)", iEnt, g_aiPropHealth[iEnt], g_iMaxHealth);
+		}
+		g_aiPropHealth[iEnt] = g_iMaxHealth;
 	}
 	
 	if (g_aiPropHealth[iEnt] > 0)
